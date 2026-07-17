@@ -154,7 +154,7 @@ public struct CareerApplicationDetailView: View {
                 LabeledContent("Role", value: application.role)
                 LabeledContent("Location", value: application.location.isEmpty ? "Not specified" : application.location)
                 LabeledContent("Arrangement", value: application.workArrangement.rawValue)
-                Picker("Status", selection: Binding(get: { application.status }, set: onStatusChange)) {
+                Picker("Status", selection: Binding(get: { application.status }, set: { status in onStatusChange(status) })) {
                     ForEach(ApplicationStatus.allCases) { status in Text(status.rawValue).tag(status) }
                 }
             }
@@ -163,7 +163,7 @@ public struct CareerApplicationDetailView: View {
                 if application.documentReferences.isEmpty {
                     Text("No document references.").foregroundStyle(.secondary)
                 } else {
-                    ForEach(application.documentReferences, id: \.self, content: Text.init)
+                    ForEach(application.documentReferences, id: \.self) { reference in Text(reference) }
                 }
             }
         }
