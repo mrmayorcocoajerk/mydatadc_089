@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 import MyDataDCCore
 @testable import MyDataDCAppShell
@@ -31,4 +32,41 @@ import MyDataDCCore
     let state = MyDataDCNavigationModel()
     state.select(.careerHQ)
     #expect(state.selectedModuleID == .careerHQ)
+}
+
+@MainActor
+@Test func navigationSelectionStoreRestoresSavedModule() {
+    let suiteName = "MyDataDCAppShellTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let store = MyDataDCNavigationSelectionStore(defaults: defaults)
+
+    store.save(.careerHQ)
+
+    #expect(store.restore() == .careerHQ)
+}
+
+@MainActor
+@Test func appStateRestoresAndPersistsNavigationSelection() {
+    let suiteName = "MyDataDCAppShellTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let store = MyDataDCNavigationSelectionStore(defaults: defaults)
+    let state = MyDataDCAppState(selectionStore: store)
+
+    state.select(.newsDesk)
+    let restoredState = MyDataDCAppState(selectionStore: store)
+
+    #expect(restoredState.selectedModuleID == .newsDesk)
+}
+
+@MainActor
+@Test func navigationSelectionStoreFallsBackForInvalidValue() {
+    let suiteName = "MyDataDCAppShellTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    defaults.set("retired-module", forKey: MyDataDCNavigationSelectionStore.defaultKey)
+    let store = MyDataDCNavigationSelectionStore(defaults: defaults)
+
+    #expect(store.restore() == .manor)
 }

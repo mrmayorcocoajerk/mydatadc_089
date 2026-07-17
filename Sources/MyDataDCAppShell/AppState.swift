@@ -63,12 +63,20 @@ public final class MyDataDCAppState: ObservableObject {
     @Published public var searchText: String
 
     private let model: MyDataDCNavigationModel
+    private let selectionStore: MyDataDCNavigationSelectionStore
 
-    public init(model: MyDataDCNavigationModel = MyDataDCNavigationModel()) {
-        self.model = model
-        self.modules = model.modules
-        self.selectedModuleID = model.selectedModuleID
-        self.searchText = model.searchText
+    public init(
+        model: MyDataDCNavigationModel? = nil,
+        selectionStore: MyDataDCNavigationSelectionStore = MyDataDCNavigationSelectionStore()
+    ) {
+        let resolvedModel = model ?? MyDataDCNavigationModel(
+            selectedModuleID: selectionStore.restore()
+        )
+        self.model = resolvedModel
+        self.selectionStore = selectionStore
+        self.modules = resolvedModel.modules
+        self.selectedModuleID = resolvedModel.selectedModuleID
+        self.searchText = resolvedModel.searchText
     }
 
     public var selectedModule: MyDataDCModule? {
@@ -99,6 +107,7 @@ public final class MyDataDCAppState: ObservableObject {
         modules = model.modules
         selectedModuleID = model.selectedModuleID
         searchText = model.searchText
+        selectionStore.save(selectedModuleID)
     }
 }
 #endif

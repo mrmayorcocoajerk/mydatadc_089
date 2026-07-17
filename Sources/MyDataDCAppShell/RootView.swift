@@ -22,6 +22,7 @@ public struct MyDataDCRootView: View {
                 }
             }
             .navigationTitle("MyDataDC")
+            .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 320)
         } detail: {
             if state.selectedModuleID == .manor {
                 ManorDashboardView(state: state)
