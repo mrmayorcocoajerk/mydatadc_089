@@ -52,7 +52,13 @@ public struct ManorDashboardView: View {
                     .foregroundStyle(.secondary)
                 Text("the operating system networked for your digital life")
                     .font(.headline)
-                    .foregroundStyle(LivingGradient())
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.cyan.opacity(0.85), .blue.opacity(0.72), .purple.opacity(0.88)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
