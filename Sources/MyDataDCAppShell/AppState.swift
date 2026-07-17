@@ -47,6 +47,10 @@ public final class MyDataDCNavigationModel {
         selectedModuleID = id
     }
 
+    public func returnToManor() {
+        select(.manor)
+    }
+
     public func setEnabled(_ enabled: Bool, for id: MyDataDCModuleID) async throws {
         try await registry.setEnabled(enabled, for: id)
         await load()
@@ -100,6 +104,11 @@ public final class MyDataDCAppState: ObservableObject {
 
     public func select(_ id: MyDataDCModuleID) {
         model.select(id)
+        synchronize()
+    }
+
+    public func returnToManor() {
+        model.returnToManor()
         synchronize()
     }
 

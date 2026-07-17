@@ -35,6 +35,15 @@ import MyDataDCCore
 }
 
 @MainActor
+@Test func appStateCanReturnToTheManor() {
+    let state = MyDataDCNavigationModel(selectedModuleID: .moneyHQ)
+
+    state.returnToManor()
+
+    #expect(state.selectedModuleID == .manor)
+}
+
+@MainActor
 @Test func navigationSelectionStoreRestoresSavedModule() {
     let suiteName = "MyDataDCAppShellTests.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suiteName)!

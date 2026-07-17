@@ -4,9 +4,11 @@ import MyDataDCCore
 
 public struct ModuleWorkspaceView: View {
     private let module: MyDataDCModule
+    private let onReturnToManor: () -> Void
 
-    public init(module: MyDataDCModule) {
+    public init(module: MyDataDCModule, onReturnToManor: @escaping () -> Void) {
         self.module = module
+        self.onReturnToManor = onReturnToManor
     }
 
     public var body: some View {
@@ -28,6 +30,11 @@ public struct ModuleWorkspaceView: View {
                         .font(.body)
                         .foregroundStyle(.tertiary)
                         .multilineTextAlignment(.center)
+                    Button(action: onReturnToManor) {
+                        Label("Back to The Manor", systemImage: "building.columns")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.cancelAction)
                 }
                 .frame(maxWidth: 640)
             }

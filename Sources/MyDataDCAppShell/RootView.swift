@@ -29,7 +29,9 @@ public struct MyDataDCRootView: View {
             } else if state.selectedModuleID == .careerHQ {
                 CareerHQView()
             } else if let module = state.selectedModule {
-                ModuleWorkspaceView(module: module)
+                ModuleWorkspaceView(module: module) {
+                    state.returnToManor()
+                }
             } else {
                 ContentUnavailableView("Module unavailable", systemImage: "exclamationmark.triangle")
             }
