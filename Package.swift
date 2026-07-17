@@ -5,6 +5,7 @@ let package = Package(
     name: "MyDataDC",
     platforms: [.macOS(.v15), .iOS(.v18)],
     products: [
+        .executable(name: "MyDataDC", targets: ["MyDataDC"]),
         .library(name: "MyDataDCCore", targets: ["MyDataDCCore"]),
         .library(name: "CareerHQCore", targets: ["CareerHQCore"]),
         .library(name: "CareerHQUI", targets: ["CareerHQUI"]),
@@ -21,6 +22,7 @@ let package = Package(
         .library(name: "NetSphereCore", targets: ["NetSphereCore"])
     ],
     targets: [
+        .executableTarget(name: "MyDataDC", dependencies: ["MyDataDCAppShell"]),
         .target(name: "MyDataDCCore"),
         .target(name: "CareerHQCore"),
         .target(name: "CareerHQUI", dependencies: ["CareerHQCore"]),
