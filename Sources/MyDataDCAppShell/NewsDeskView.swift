@@ -71,6 +71,38 @@ public struct NewsDeskView: View {
                     }
                 }
                 .frame(maxWidth: 620)
+
+                HStack(spacing: MyDataDCSpacing.small) {
+                    Button {
+                        Task { await viewModel.refresh() }
+                    } label: {
+                        if viewModel.isRefreshing {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Label("Refresh Briefing", systemImage: "arrow.clockwise")
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(viewModel.isRefreshing)
+
+                    if let briefing = viewModel.briefing {
+                        Text("Updated \(briefing.generatedAt.formatted(date: .abbreviated, time: .shortened))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if let message = viewModel.statusMessage {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if let message = viewModel.errorMessage {
+                    Label(message, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
             }
         }
     }
@@ -123,6 +155,10 @@ public struct NewsDeskView: View {
                 Text("\(article.source.name) · \(article.publishedAt.formatted(date: .abbreviated, time: .shortened))")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
+                if let url = article.canonicalURL {
+                    Link("Read full story", destination: url)
+                        .font(.caption.bold())
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }

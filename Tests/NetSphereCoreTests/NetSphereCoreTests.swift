@@ -88,3 +88,40 @@ private func article(
     let snapshot = await restored.currentSnapshot()
     #expect(snapshot.articles.first?.publishedAt == timestamp)
 }
+
+@Test func rssParserNormalizesHeadlineSummaryDateAndTopics() throws {
+    let xml = """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <rss version="2.0"><channel><item>
+      <title>  A &amp; B headline  </title>
+      <description><![CDATA[<p>A useful <strong>summary</strong>.</p>]]></description>
+      <link>https://example.com/story</link>
+      <pubDate>Fri, 17 Jul 2026 12:30:00 +0000</pubDate>
+      <category>Technology</category>
+    </item></channel></rss>
+    """
+    let endpoint = NewsFeedEndpoint(
+        name: "Example Wire",
+        url: URL(string: "https://example.com/rss.xml")!,
+        scope: .technology
+    )
+    let articles = try RSSFeedParser.parse(Data(xml.utf8), endpoint: endpoint)
+
+    #expect(articles.count == 1)
+    #expect(articles[0].headline == "A & B headline")
+    #expect(articles[0].summary == "A useful summary .")
+    #expect(articles[0].publishedAt == Date(timeIntervalSince1970: 1_784_291_400))
+    #expect(articles[0].topics == ["technology"])
+    #expect(articles[0].canonicalURL?.absoluteString == "https://example.com/story")
+}
+
+@Test func rssParserRejectsMalformedXML() {
+    let endpoint = NewsFeedEndpoint(
+        name: "Example Wire",
+        url: URL(string: "https://example.com/rss.xml")!,
+        scope: .world
+    )
+    #expect(throws: NewsFeedError.malformedFeed) {
+        try RSSFeedParser.parse(Data("<rss><item>".utf8), endpoint: endpoint)
+    }
+}

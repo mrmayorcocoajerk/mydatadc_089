@@ -113,7 +113,7 @@ import NetSphereCore
         topics: ["weather"]
     )
     let store = NetSphereStore(snapshot: .init(articles: [routine, breaking]))
-    let viewModel = NewsDeskViewModel(store: store)
+    let viewModel = NewsDeskViewModel(store: store, persistenceURL: nil)
 
     await viewModel.load()
     #expect(viewModel.displayedArticles.first?.id == breaking.id)
@@ -133,7 +133,8 @@ import NetSphereCore
     )
     let viewModel = NewsDeskViewModel(
         store: NetSphereStore(snapshot: .init(articles: [article])),
-        query: "science"
+        query: "science",
+        persistenceURL: nil
     )
 
     await viewModel.load()
@@ -142,4 +143,44 @@ import NetSphereCore
 
     #expect(viewModel.query.isEmpty)
     #expect(viewModel.isSaved(article))
+}
+
+private struct StubNewsFeedLoader: NewsFeedLoading {
+    let articles: [NewsArticle]
+
+    func fetch(_ endpoint: NewsFeedEndpoint) async throws -> [NewsArticle] {
+        articles
+    }
+}
+
+@MainActor
+@Test func newsDeskRefreshesAndPersistsBriefing() async throws {
+    let article = NewsArticle(
+        headline: "A live briefing",
+        summary: "Fresh reporting.",
+        scope: .world,
+        source: NewsSource(name: "Test Wire", domain: "example.com", reliabilityScore: 0.8),
+        publishedAt: Date(timeIntervalSince1970: 30_000)
+    )
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString)
+        .appendingPathComponent("NewsDesk.json")
+    defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+    let endpoint = NewsFeedEndpoint(
+        name: "Test Wire",
+        url: URL(string: "https://example.com/rss.xml")!,
+        scope: .world
+    )
+    let viewModel = NewsDeskViewModel(
+        feedLoader: StubNewsFeedLoader(articles: [article]),
+        endpoints: [endpoint],
+        persistenceURL: url
+    )
+
+    await viewModel.refresh()
+
+    #expect(viewModel.displayedArticles.map(\.headline) == ["A live briefing"])
+    #expect(viewModel.briefing != nil)
+    #expect(FileManager.default.fileExists(atPath: url.path))
+    #expect(viewModel.errorMessage == nil)
 }
