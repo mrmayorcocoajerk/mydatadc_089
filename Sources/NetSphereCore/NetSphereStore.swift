@@ -30,6 +30,18 @@ public actor NetSphereStore {
         snapshot.subscriptions.removeAll { $0.normalizedName == normalizedName }
     }
 
+    @discardableResult
+    public func pruneArticles(olderThan cutoff: Date, preservingSaved: Bool = true) -> Int {
+        let originalCount = snapshot.articles.count
+        snapshot.articles.removeAll { article in
+            article.publishedAt < cutoff
+                && (!preservingSaved || !snapshot.savedArticleIDs.contains(article.id))
+        }
+        let retainedIDs = Set(snapshot.articles.map(\.id))
+        snapshot.savedArticleIDs.formIntersection(retainedIDs)
+        return originalCount - snapshot.articles.count
+    }
+
     public func toggleSaved(articleID: UUID) {
         if snapshot.savedArticleIDs.contains(articleID) {
             snapshot.savedArticleIDs.remove(articleID)

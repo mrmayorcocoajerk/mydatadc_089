@@ -82,6 +82,14 @@ private func article(
     #expect(ranked.isEmpty)
 }
 
+@Test func infersBreakingAndCriticalUrgencyFromHeadlineLanguage() {
+    let warning = article(headline: "Storm warning issued")
+    let emergency = article(headline: "Evacuation emergency declared")
+    #expect(NetSphereEngine.urgency(for: warning) == .breaking)
+    #expect(NetSphereEngine.urgency(for: emergency) == .critical)
+    #expect(NetSphereEngine.breakingArticles([warning, emergency]).count == 2)
+}
+
 @Test func briefingIncludesFeelsLikeAndAlerts() {
     let now = Date(timeIntervalSince1970: 20_000)
     let breaking = article(headline: "Storm warning", urgency: .critical, publishedAt: now)
@@ -113,6 +121,22 @@ private func article(
     await store.removeSubscription(named: " technology ")
     let snapshot = await store.currentSnapshot()
     #expect(snapshot.subscriptions.isEmpty)
+}
+
+@Test func storePrunesStaleArticlesButPreservesBookmarks() async {
+    let now = Date(timeIntervalSince1970: 1_000_000)
+    let stale = article(headline: "Stale", publishedAt: now.addingTimeInterval(-100_000))
+    let saved = article(headline: "Saved stale", publishedAt: now.addingTimeInterval(-100_000))
+    let fresh = article(headline: "Fresh", publishedAt: now)
+    let store = NetSphereStore(snapshot: .init(
+        articles: [stale, saved, fresh],
+        savedArticleIDs: [saved.id]
+    ))
+    let removed = await store.pruneArticles(olderThan: now.addingTimeInterval(-10_000))
+    let snapshot = await store.currentSnapshot()
+    #expect(removed == 1)
+    #expect(Set(snapshot.articles.map(\.id)) == [saved.id, fresh.id])
+    #expect(snapshot.savedArticleIDs == [saved.id])
 }
 
 @Test func persistenceRoundTripPreservesDates() async throws {

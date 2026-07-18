@@ -26,9 +26,19 @@ public struct NewsDeskView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: MyDataDCSpacing.large) {
                     header
+                    if !viewModel.hasActiveFilters {
+                        if !viewModel.breakingArticles.isEmpty {
+                            breakingPanel
+                        }
+                        if viewModel.briefing != nil {
+                            dailyBriefingPanel
+                        }
+                    }
                     if viewModel.displayedArticles.isEmpty {
                         emptyState
                     } else {
+                        Text("All Stories")
+                            .font(.title2.bold())
                         LazyVStack(spacing: MyDataDCSpacing.medium) {
                             ForEach(viewModel.displayedArticles) { article in
                                 articleCard(article)
@@ -185,6 +195,81 @@ public struct NewsDeskView: View {
         }
     }
 
+    private var breakingPanel: some View {
+        FrostedPanel {
+            VStack(alignment: .leading, spacing: MyDataDCSpacing.small) {
+                Label("Breaking & Critical", systemImage: "exclamationmark.triangle.fill")
+                    .font(.headline)
+                    .foregroundStyle(.red)
+                ForEach(viewModel.breakingArticles.prefix(3)) { article in
+                    HStack(alignment: .firstTextBaseline) {
+                        Circle()
+                            .fill(.red)
+                            .frame(width: 7, height: 7)
+                        Text(article.headline)
+                            .font(.subheadline.bold())
+                        Spacer()
+                        Text(article.source.name)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var dailyBriefingPanel: some View {
+        FrostedPanel {
+            VStack(alignment: .leading, spacing: MyDataDCSpacing.medium) {
+                HStack {
+                    Label("Daily Briefing", systemImage: "sun.max.fill")
+                        .font(.title2.bold())
+                    Spacer()
+                    if let age = viewModel.refreshAgeText(),
+                       let freshness = viewModel.briefingFreshness() {
+                        Text(age)
+                            .font(.caption.bold())
+                            .foregroundStyle(freshnessColor(for: freshness))
+                            .padding(.horizontal, MyDataDCSpacing.small)
+                            .padding(.vertical, MyDataDCSpacing.xSmall)
+                            .background(freshnessColor(for: freshness).opacity(0.12), in: Capsule())
+                    }
+                }
+
+                if let briefing = viewModel.briefing, !briefing.highlights.isEmpty {
+                    ForEach(briefing.highlights, id: \.self) { highlight in
+                        Label(highlight, systemImage: "sparkles")
+                            .font(.subheadline.bold())
+                    }
+                }
+
+                ForEach(viewModel.briefingArticles.prefix(5)) { article in
+                    HStack(alignment: .firstTextBaseline, spacing: MyDataDCSpacing.small) {
+                        Text(article.scope.displayName.uppercased())
+                            .font(.caption.bold())
+                            .foregroundStyle(.secondary)
+                            .frame(width: 90, alignment: .leading)
+                        Text(article.headline)
+                            .font(.subheadline.weight(.semibold))
+                        Spacer()
+                        if let url = article.canonicalURL {
+                            Link(destination: url) {
+                                Image(systemName: "arrow.up.right.square")
+                            }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel("Read \(article.headline)")
+                        }
+                    }
+                    if article.id != viewModel.briefingArticles.prefix(5).last?.id {
+                        Divider()
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
     private func articleCard(_ article: NewsArticle) -> some View {
         FrostedPanel {
             VStack(alignment: .leading, spacing: MyDataDCSpacing.small) {
@@ -239,6 +324,14 @@ public struct NewsDeskView: View {
         case .cached: .blue
         case .updated: .green
         case .unavailable: .orange
+        }
+    }
+
+    private func freshnessColor(for freshness: NewsDeskBriefingFreshness) -> Color {
+        switch freshness {
+        case .fresh: .green
+        case .aging: .orange
+        case .stale: .red
         }
     }
 }

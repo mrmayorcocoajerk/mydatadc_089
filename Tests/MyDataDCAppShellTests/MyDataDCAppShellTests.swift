@@ -319,3 +319,68 @@ private struct PartialNewsFeedLoader: NewsFeedLoading {
     await viewModel.load()
     #expect(viewModel.availableTopics.contains("world"))
 }
+
+@MainActor
+@Test func newsDeskReportsBriefingFreshnessAndPrunesUnsavedStaleStories() async {
+    let now = Date()
+    let source = NewsSource(name: "Briefing Wire", domain: "example.com", reliabilityScore: 0.8)
+    let stale = NewsArticle(
+        headline: "Old report",
+        summary: "No longer current.",
+        scope: .world,
+        source: source,
+        publishedAt: now.addingTimeInterval(-10 * 24 * 60 * 60)
+    )
+    let saved = NewsArticle(
+        headline: "Saved old report",
+        summary: "Kept for later.",
+        scope: .world,
+        source: source,
+        publishedAt: now.addingTimeInterval(-10 * 24 * 60 * 60)
+    )
+    let briefing = DailyBriefing(
+        generatedAt: now.addingTimeInterval(-7 * 60 * 60),
+        articles: [stale, saved]
+    )
+    let viewModel = NewsDeskViewModel(
+        store: NetSphereStore(snapshot: .init(
+            articles: [stale, saved],
+            savedArticleIDs: [saved.id],
+            lastBriefing: briefing
+        )),
+        endpoints: [],
+        persistenceURL: nil
+    )
+
+    await viewModel.load()
+
+    #expect(viewModel.displayedArticles.map(\.id) == [saved.id])
+    #expect(viewModel.briefingFreshness(now: now) == .fresh)
+    #expect(viewModel.refreshAgeText(now: now) == "Just updated")
+}
+
+@MainActor
+@Test func newsDeskMarksAnOldBriefingAsStale() async {
+    let now = Date()
+    let article = NewsArticle(
+        headline: "Current report",
+        summary: "Still inside retention.",
+        scope: .world,
+        source: NewsSource(name: "Briefing Wire", domain: "example.com", reliabilityScore: 0.8),
+        publishedAt: now
+    )
+    let viewModel = NewsDeskViewModel(
+        store: NetSphereStore(snapshot: .init(
+            articles: [article],
+            lastBriefing: DailyBriefing(
+                generatedAt: now.addingTimeInterval(-7 * 60 * 60),
+                articles: [article]
+            )
+        )),
+        endpoints: [],
+        persistenceURL: nil
+    )
+    await viewModel.load()
+    #expect(viewModel.briefingFreshness(now: now) == .stale)
+    #expect(viewModel.refreshAgeText(now: now) == "Updated 7h ago")
+}

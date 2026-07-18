@@ -48,6 +48,12 @@ public enum NewsDeskTopicMode: String, CaseIterable, Hashable, Sendable {
     }
 }
 
+public enum NewsDeskBriefingFreshness: Equatable, Sendable {
+    case fresh
+    case aging
+    case stale
+}
+
 @MainActor
 public final class NewsDeskViewModel: ObservableObject {
     @Published public var query: String
@@ -121,6 +127,35 @@ public final class NewsDeskViewModel: ObservableObject {
         snapshot.lastBriefing
     }
 
+    public var briefingArticles: [NewsArticle] {
+        snapshot.lastBriefing?.articles ?? []
+    }
+
+    public var breakingArticles: [NewsArticle] {
+        NetSphereEngine.ranked(
+            snapshot.articles,
+            subscriptions: snapshot.subscriptions
+        )
+        .filter { NetSphereEngine.urgency(for: $0) >= .breaking }
+    }
+
+    public func briefingFreshness(now: Date = Date()) -> NewsDeskBriefingFreshness? {
+        guard let generatedAt = briefing?.generatedAt else { return nil }
+        let age = max(0, now.timeIntervalSince(generatedAt))
+        if age < 3_600 { return .fresh }
+        if age < 21_600 { return .aging }
+        return .stale
+    }
+
+    public func refreshAgeText(now: Date = Date()) -> String? {
+        guard let generatedAt = briefing?.generatedAt else { return nil }
+        let seconds = max(0, Int(now.timeIntervalSince(generatedAt)))
+        if seconds < 60 { return "Just updated" }
+        if seconds < 3_600 { return "Updated \(seconds / 60)m ago" }
+        if seconds < 86_400 { return "Updated \(seconds / 3_600)h ago" }
+        return "Updated \(seconds / 86_400)d ago"
+    }
+
     public func load() async {
         if let persistenceURL, FileManager.default.fileExists(atPath: persistenceURL.path) {
             do {
@@ -128,6 +163,12 @@ public final class NewsDeskViewModel: ObservableObject {
             } catch {
                 errorMessage = "Saved briefing could not be loaded: \(error.localizedDescription)"
             }
+        }
+        let cutoff = Date().addingTimeInterval(-Self.articleRetentionInterval)
+        let removedCount = await store.pruneArticles(olderThan: cutoff)
+        if removedCount > 0 {
+            await store.generateBriefing()
+            await persist()
         }
         snapshot = await store.currentSnapshot()
         sourceStatuses = endpoints.map { endpoint in
@@ -174,6 +215,7 @@ public final class NewsDeskViewModel: ObservableObject {
         }
 
         await store.ingest(fetched)
+        await store.pruneArticles(olderThan: Date().addingTimeInterval(-Self.articleRetentionInterval))
         await store.generateBriefing()
         await persist()
         snapshot = await store.currentSnapshot()
@@ -274,5 +316,7 @@ public final class NewsDeskViewModel: ObservableObject {
             .appendingPathComponent("MyDataDC", isDirectory: true)
             .appendingPathComponent("NewsDesk.json")
     }
+
+    private static let articleRetentionInterval: TimeInterval = 7 * 24 * 60 * 60
 }
 #endif

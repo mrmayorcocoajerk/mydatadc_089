@@ -45,7 +45,7 @@ public enum NetSphereEngine {
         if let alert = weather?.severeAlert, !alert.isEmpty {
             highlights.append("Weather alert: \(alert)")
         }
-        if let breaking = selected.first(where: { $0.urgency >= .breaking }) {
+        if let breaking = selected.first(where: { urgency(for: $0) >= .breaking }) {
             highlights.append("Breaking: \(breaking.headline)")
         }
         if let strongest = markets.max(by: { abs($0.changePercent) < abs($1.changePercent) }) {
@@ -63,7 +63,7 @@ public enum NetSphereEngine {
     }
 
     public static func breakingArticles(_ articles: [NewsArticle]) -> [NewsArticle] {
-        deduplicated(articles).filter { $0.urgency >= .breaking }
+        deduplicated(articles).filter { urgency(for: $0) >= .breaking }
     }
 
     public static func matches(_ article: NewsArticle, query: String) -> Bool {
@@ -100,6 +100,26 @@ public enum NetSphereEngine {
         return topics
     }
 
+    public static func urgency(for article: NewsArticle) -> NewsUrgency {
+        let words = (article.headline + " " + article.summary)
+            .lowercased()
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        let searchable = " \(words) "
+        let inferred: NewsUrgency
+        if ["emergency", "evacuation", "catastrophic"].contains(where: { searchable.contains(" \($0) ") }) {
+            inferred = .critical
+        } else if ["breaking", "alert", "warning"].contains(where: { searchable.contains(" \($0) ") }) {
+            inferred = .breaking
+        } else if ["developing", "live"].contains(where: { searchable.contains(" \($0) ") }) {
+            inferred = .notable
+        } else {
+            inferred = .routine
+        }
+        return max(article.urgency, inferred)
+    }
+
     private static func canonicalKey(for article: NewsArticle) -> String {
         if let url = article.canonicalURL {
             var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
@@ -119,7 +139,7 @@ public enum NetSphereEngine {
 
     private static func score(_ article: NewsArticle, activeTopics: [String: Int], now: Date) -> Double {
         let urgencyScore: Double
-        switch article.urgency {
+        switch urgency(for: article) {
         case .routine: urgencyScore = 0
         case .notable: urgencyScore = 20
         case .breaking: urgencyScore = 50
