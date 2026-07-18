@@ -32,6 +32,10 @@ public struct MyDataDCRootView: View {
                 NewsDeskView {
                     state.returnToManor()
                 }
+            } else if state.selectedModuleID == .moneyHQ {
+                MoneyHQView {
+                    state.returnToManor()
+                }
             } else if let module = state.selectedModule {
                 ModuleWorkspaceView(module: module) {
                     state.returnToManor()

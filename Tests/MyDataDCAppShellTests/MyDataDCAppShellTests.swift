@@ -2,7 +2,32 @@ import Foundation
 import Testing
 import MyDataDCCore
 import NetSphereCore
+import MoneyHQCore
 @testable import MyDataDCAppShell
+
+@MainActor
+@Test func moneyHQAddsAccountsAndSignedTransactions() async throws {
+    let viewModel = MoneyHQViewModel(store: MoneyHQStore(), persistenceURL: nil)
+    try await viewModel.addAccount(name: "Checking", institution: "Test Bank", kind: .checking, openingBalance: 100)
+    let account = try #require(viewModel.snapshot.accounts.first)
+
+    try await viewModel.addTransaction(accountID: account.id, payee: "Payroll", category: "Income", amount: 50, isIncome: true, date: Date(), isPending: false)
+    try await viewModel.addTransaction(accountID: account.id, payee: "Cafe", category: "Food", amount: 20, isIncome: false, date: Date(), isPending: true)
+
+    #expect(viewModel.balances[account.id] == 130)
+    #expect(viewModel.snapshot.transactions.map(\.amount) == [50, -20])
+    #expect(viewModel.recentTransactions.count == 2)
+}
+
+@MainActor
+@Test func moneyHQLiabilityOpeningBalanceIsStoredAsDebt() async throws {
+    let viewModel = MoneyHQViewModel(store: MoneyHQStore(), persistenceURL: nil)
+    try await viewModel.addAccount(name: "Card", institution: "Test Bank", kind: .creditCard, openingBalance: 400)
+
+    #expect(viewModel.snapshot.accounts.first?.openingBalance == -400)
+    #expect(viewModel.summary.liabilities == 400)
+    #expect(viewModel.summary.netWorth == -400)
+}
 
 @MainActor
 @Test func appStateStartsAtTheManor() {
