@@ -239,3 +239,83 @@ private struct PartialNewsFeedLoader: NewsFeedLoading {
     #expect(viewModel.statusMessage?.contains("Unavailable Wire") == true)
     #expect(viewModel.errorMessage == nil)
 }
+
+@MainActor
+@Test func newsDeskTopicPreferencesMuteAndPrioritizeStories() async {
+    let now = Date(timeIntervalSince1970: 50_000)
+    let source = NewsSource(name: "Topic Wire", domain: "example.com", reliabilityScore: 0.8)
+    let technology = NewsArticle(
+        headline: "Technology story",
+        summary: "A technology update.",
+        scope: .technology,
+        source: source,
+        publishedAt: now,
+        topics: ["technology"]
+    )
+    let culture = NewsArticle(
+        headline: "Culture story",
+        summary: "A culture update.",
+        scope: .culture,
+        source: source,
+        publishedAt: now,
+        topics: ["culture"]
+    )
+    let viewModel = NewsDeskViewModel(
+        store: NetSphereStore(snapshot: .init(articles: [culture, technology])),
+        persistenceURL: nil
+    )
+    await viewModel.load()
+
+    await viewModel.setTopicMode(.followed, for: "technology")
+    await viewModel.setPriority(100, for: "technology")
+    #expect(viewModel.displayedArticles.first?.id == technology.id)
+    #expect(viewModel.priority(for: "technology") == 100)
+
+    await viewModel.setTopicMode(.muted, for: "technology")
+    #expect(viewModel.displayedArticles.map(\.id) == [culture.id])
+
+    await viewModel.setTopicMode(.neutral, for: "technology")
+    #expect(viewModel.topicMode(for: "technology") == .neutral)
+}
+
+@MainActor
+@Test func newsDeskTopicPreferencesPersistBetweenViewModels() async {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString)
+        .appendingPathComponent("NewsDesk.json")
+    defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+    let first = NewsDeskViewModel(
+        store: NetSphereStore(snapshot: .init(subscriptions: [
+            .init(name: "science", priority: 80)
+        ])),
+        endpoints: [],
+        persistenceURL: url
+    )
+    await first.load()
+    await first.setPriority(90, for: "science")
+
+    let restored = NewsDeskViewModel(endpoints: [], persistenceURL: url)
+    await restored.load()
+
+    #expect(restored.topicMode(for: "science") == .followed)
+    #expect(restored.priority(for: "science") == 90)
+}
+
+@MainActor
+@Test func newsDeskExposesTopicsForPreviouslyUncategorizedStories() async {
+    let cached = NewsArticle(
+        headline: "World briefing",
+        summary: "An uncategorized report.",
+        scope: .world,
+        source: NewsSource(name: "Cached Wire", domain: "example.com", reliabilityScore: 0.8),
+        publishedAt: Date(),
+        topics: []
+    )
+    let viewModel = NewsDeskViewModel(
+        store: NetSphereStore(snapshot: .init(articles: [cached])),
+        endpoints: [],
+        persistenceURL: nil
+    )
+    await viewModel.load()
+    #expect(viewModel.availableTopics.contains("world"))
+}

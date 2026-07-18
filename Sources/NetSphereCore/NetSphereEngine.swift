@@ -20,12 +20,15 @@ public enum NetSphereEngine {
         now: Date = Date()
     ) -> [NewsArticle] {
         let active = Dictionary(uniqueKeysWithValues: subscriptions.filter { !$0.isMuted }.map { ($0.normalizedName, $0.priority) })
-        return deduplicated(articles).sorted { lhs, rhs in
-            let lhsScore = score(lhs, activeTopics: active, now: now)
-            let rhsScore = score(rhs, activeTopics: active, now: now)
-            if lhsScore == rhsScore { return lhs.publishedAt > rhs.publishedAt }
-            return lhsScore > rhsScore
-        }
+        let muted = Set(subscriptions.filter(\.isMuted).map(\.normalizedName))
+        return deduplicated(articles)
+            .filter { topics(for: $0).isDisjoint(with: muted) }
+            .sorted { lhs, rhs in
+                let lhsScore = score(lhs, activeTopics: active, now: now)
+                let rhsScore = score(rhs, activeTopics: active, now: now)
+                if lhsScore == rhsScore { return lhs.publishedAt > rhs.publishedAt }
+                return lhsScore > rhsScore
+            }
     }
 
     public static func briefing(
@@ -69,7 +72,32 @@ public enum NetSphereEngine {
         if article.headline.lowercased().contains(needle) { return true }
         if article.summary.lowercased().contains(needle) { return true }
         if article.source.name.lowercased().contains(needle) { return true }
-        return article.topics.contains { $0.contains(needle) }
+        return topics(for: article).contains { $0.contains(needle) }
+    }
+
+    public static func topics(for article: NewsArticle) -> Set<String> {
+        var topics = article.topics
+        topics.insert(article.scope.displayName.lowercased())
+
+        let words = (article.headline + " " + article.summary)
+            .lowercased()
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        let searchable = " \(words) "
+        let rules: [(topic: String, keywords: [String])] = [
+            ("business", ["business", "economy", "market", "finance", "company"]),
+            ("technology", ["technology", "tech", "ai", "software", "cyber", "digital"]),
+            ("science", ["science", "research", "space", "climate", "nasa"]),
+            ("health", ["health", "medical", "medicine", "hospital"]),
+            ("culture", ["culture", "film", "music", "art", "arts"]),
+            ("sports", ["sports", "sport", "game", "tournament"]),
+            ("politics", ["politics", "election", "government", "president", "parliament"])
+        ]
+        for rule in rules where rule.keywords.contains(where: { searchable.contains(" \($0) ") }) {
+            topics.insert(rule.topic)
+        }
+        return topics
     }
 
     private static func canonicalKey(for article: NewsArticle) -> String {
@@ -98,7 +126,7 @@ public enum NetSphereEngine {
         case .critical: urgencyScore = 80
         }
 
-        let topicScore = article.topics.reduce(0.0) { partial, topic in
+        let topicScore = topics(for: article).reduce(0.0) { partial, topic in
             partial + Double(activeTopics[topic] ?? 0) * 0.4
         }
         let reliabilityScore = article.source.reliabilityScore * 20

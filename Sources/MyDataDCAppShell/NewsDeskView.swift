@@ -4,6 +4,7 @@ import NetSphereCore
 
 public struct NewsDeskView: View {
     @StateObject private var viewModel: NewsDeskViewModel
+    @State private var showsTopicPreferences = false
     private let onReturnToManor: () -> Void
 
     public init(
@@ -40,6 +41,9 @@ public struct NewsDeskView: View {
         }
         .navigationTitle("NewsDesk")
         .task { await viewModel.load() }
+        .sheet(isPresented: $showsTopicPreferences) {
+            NewsDeskTopicPreferencesView(viewModel: viewModel)
+        }
     }
 
     private var header: some View {
@@ -86,6 +90,13 @@ public struct NewsDeskView: View {
                         Label("Saved (\(viewModel.savedArticleCount))", systemImage: "bookmark.fill")
                     }
                     .toggleStyle(.button)
+
+                    Button {
+                        showsTopicPreferences = true
+                    } label: {
+                        Label("Topics (\(viewModel.followedTopicCount))", systemImage: "slider.horizontal.3")
+                    }
+                    .buttonStyle(.bordered)
 
                     if viewModel.hasActiveFilters {
                         Button("Reset filters") { viewModel.resetFilters() }
@@ -229,6 +240,71 @@ public struct NewsDeskView: View {
         case .updated: .green
         case .unavailable: .orange
         }
+    }
+}
+
+private struct NewsDeskTopicPreferencesView: View {
+    @ObservedObject var viewModel: NewsDeskViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if viewModel.availableTopics.isEmpty {
+                    ContentUnavailableView(
+                        "No topics yet",
+                        systemImage: "tag",
+                        description: Text("Refresh NewsDesk to discover topics from your sources.")
+                    )
+                } else {
+                    List(viewModel.availableTopics, id: \.self) { topic in
+                        VStack(alignment: .leading, spacing: MyDataDCSpacing.small) {
+                            HStack {
+                                Text(viewModel.topicDisplayName(topic))
+                                    .font(.headline)
+                                Spacer()
+                                Picker("Preference", selection: Binding(
+                                    get: { viewModel.topicMode(for: topic) },
+                                    set: { mode in
+                                        Task { await viewModel.setTopicMode(mode, for: topic) }
+                                    }
+                                )) {
+                                    ForEach(NewsDeskTopicMode.allCases, id: \.self) { mode in
+                                        Text(mode.displayName).tag(mode)
+                                    }
+                                }
+                                .labelsHidden()
+                                .frame(width: 130)
+                            }
+
+                            if viewModel.topicMode(for: topic) == .followed {
+                                Stepper(
+                                    "Priority \(viewModel.priority(for: topic))",
+                                    value: Binding(
+                                        get: { viewModel.priority(for: topic) },
+                                        set: { priority in
+                                            Task { await viewModel.setPriority(priority, for: topic) }
+                                        }
+                                    ),
+                                    in: 0...100,
+                                    step: 10
+                                )
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.vertical, MyDataDCSpacing.xSmall)
+                    }
+                }
+            }
+            .navigationTitle("Topic Preferences")
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .frame(minWidth: 520, minHeight: 460)
     }
 }
 #endif

@@ -50,6 +50,38 @@ private func article(
     #expect(ranked.first?.id == breaking.id)
 }
 
+@Test func rankingExcludesMutedTopics() {
+    let muted = article(headline: "Muted politics", topics: ["politics"])
+    let visible = article(headline: "Visible science", topics: ["science"])
+    let ranked = NetSphereEngine.ranked(
+        [muted, visible],
+        subscriptions: [.init(name: "politics", isMuted: true)]
+    )
+    #expect(ranked.map(\.id) == [visible.id])
+}
+
+@Test func infersTopicsForUncategorizedAndCachedArticles() {
+    let cached = NewsArticle(
+        headline: "AI research reaches hospitals",
+        summary: "A digital health study.",
+        scope: .world,
+        source: source,
+        publishedAt: Date(),
+        topics: []
+    )
+    let topics = NetSphereEngine.topics(for: cached)
+    #expect(topics.contains("world"))
+    #expect(topics.contains("technology"))
+    #expect(topics.contains("science"))
+    #expect(topics.contains("health"))
+
+    let ranked = NetSphereEngine.ranked(
+        [cached],
+        subscriptions: [.init(name: "world", isMuted: true)]
+    )
+    #expect(ranked.isEmpty)
+}
+
 @Test func briefingIncludesFeelsLikeAndAlerts() {
     let now = Date(timeIntervalSince1970: 20_000)
     let breaking = article(headline: "Storm warning", urgency: .critical, publishedAt: now)
@@ -74,6 +106,13 @@ private func article(
     await store.ingest([first, second])
     let snapshot = await store.currentSnapshot()
     #expect(snapshot.articles.count == 1)
+}
+
+@Test func storeRemovesSubscriptionByNormalizedName() async {
+    let store = NetSphereStore(snapshot: .init(subscriptions: [.init(name: "Technology")]))
+    await store.removeSubscription(named: " technology ")
+    let snapshot = await store.currentSnapshot()
+    #expect(snapshot.subscriptions.isEmpty)
 }
 
 @Test func persistenceRoundTripPreservesDates() async throws {

@@ -25,6 +25,11 @@ public actor NetSphereStore {
         }
     }
 
+    public func removeSubscription(named name: String) {
+        let normalizedName = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        snapshot.subscriptions.removeAll { $0.normalizedName == normalizedName }
+    }
+
     public func toggleSaved(articleID: UUID) {
         if snapshot.savedArticleIDs.contains(articleID) {
             snapshot.savedArticleIDs.remove(articleID)

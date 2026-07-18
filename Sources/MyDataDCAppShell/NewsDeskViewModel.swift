@@ -34,6 +34,20 @@ public struct NewsDeskSourceStatus: Identifiable, Equatable, Sendable {
     }
 }
 
+public enum NewsDeskTopicMode: String, CaseIterable, Hashable, Sendable {
+    case neutral
+    case followed
+    case muted
+
+    public var displayName: String {
+        switch self {
+        case .neutral: "Neutral"
+        case .followed: "Follow"
+        case .muted: "Mute"
+        }
+    }
+}
+
 @MainActor
 public final class NewsDeskViewModel: ObservableObject {
     @Published public var query: String
@@ -92,6 +106,16 @@ public final class NewsDeskViewModel: ObservableObject {
     }
 
     public var savedArticleCount: Int { snapshot.savedArticleIDs.count }
+
+    public var availableTopics: [String] {
+        let articleTopics = snapshot.articles.flatMap { NetSphereEngine.topics(for: $0) }
+        let subscribedTopics = snapshot.subscriptions.map(\.normalizedName)
+        return Array(Set(articleTopics).union(subscribedTopics)).sorted()
+    }
+
+    public var followedTopicCount: Int {
+        snapshot.subscriptions.filter { !$0.isMuted }.count
+    }
 
     public var briefing: DailyBriefing? {
         snapshot.lastBriefing
@@ -168,6 +192,53 @@ public final class NewsDeskViewModel: ObservableObject {
         showsSavedOnly = false
     }
 
+    public func topicMode(for topic: String) -> NewsDeskTopicMode {
+        guard let subscription = subscription(for: topic) else { return .neutral }
+        return subscription.isMuted ? .muted : .followed
+    }
+
+    public func priority(for topic: String) -> Int {
+        subscription(for: topic)?.priority ?? 70
+    }
+
+    public func setTopicMode(_ mode: NewsDeskTopicMode, for topic: String) async {
+        let current = subscription(for: topic)
+        switch mode {
+        case .neutral:
+            await store.removeSubscription(named: topic)
+        case .followed:
+            await store.upsertSubscription(TopicSubscription(
+                id: current?.id ?? UUID(),
+                name: topic,
+                isMuted: false,
+                priority: current?.priority ?? 70
+            ))
+        case .muted:
+            await store.upsertSubscription(TopicSubscription(
+                id: current?.id ?? UUID(),
+                name: topic,
+                isMuted: true,
+                priority: current?.priority ?? 70
+            ))
+        }
+        await updateBriefingAndPersist()
+    }
+
+    public func setPriority(_ priority: Int, for topic: String) async {
+        let current = subscription(for: topic)
+        await store.upsertSubscription(TopicSubscription(
+            id: current?.id ?? UUID(),
+            name: topic,
+            isMuted: false,
+            priority: priority
+        ))
+        await updateBriefingAndPersist()
+    }
+
+    public func topicDisplayName(_ topic: String) -> String {
+        topic.split(separator: " ").map { $0.capitalized }.joined(separator: " ")
+    }
+
     public func isSaved(_ article: NewsArticle) -> Bool {
         snapshot.savedArticleIDs.contains(article.id)
     }
@@ -185,6 +256,17 @@ public final class NewsDeskViewModel: ObservableObject {
         } catch {
             errorMessage = "Briefing could not be saved: \(error.localizedDescription)"
         }
+    }
+
+    private func subscription(for topic: String) -> TopicSubscription? {
+        let normalized = topic.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return snapshot.subscriptions.first { $0.normalizedName == normalized }
+    }
+
+    private func updateBriefingAndPersist() async {
+        await store.generateBriefing()
+        await persist()
+        snapshot = await store.currentSnapshot()
     }
 
     public static var defaultPersistenceURL: URL? {
