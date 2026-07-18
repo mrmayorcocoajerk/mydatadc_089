@@ -1,7 +1,22 @@
 import Foundation
 
-public enum NewsScope: String, Codable, CaseIterable, Sendable {
+public enum NewsScope: String, Codable, CaseIterable, Hashable, Sendable {
     case world, unitedStates, local, business, technology, science, health, culture, sports, politics
+
+    public var displayName: String {
+        switch self {
+        case .world: "World"
+        case .unitedStates: "United States"
+        case .local: "Local"
+        case .business: "Business"
+        case .technology: "Technology"
+        case .science: "Science"
+        case .health: "Health"
+        case .culture: "Culture"
+        case .sports: "Sports"
+        case .politics: "Politics"
+        }
+    }
 }
 
 public enum NewsUrgency: String, Codable, CaseIterable, Sendable, Comparable {

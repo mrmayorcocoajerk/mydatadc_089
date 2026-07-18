@@ -73,6 +73,32 @@ public struct NewsDeskView: View {
                 .frame(maxWidth: 620)
 
                 HStack(spacing: MyDataDCSpacing.small) {
+                    Picker("Scope", selection: $viewModel.selectedScope) {
+                        Text("All scopes").tag(nil as NewsScope?)
+                        ForEach(viewModel.availableScopes, id: \.self) { scope in
+                            Text(scope.displayName).tag(scope as NewsScope?)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(width: 190)
+
+                    Toggle(isOn: $viewModel.showsSavedOnly) {
+                        Label("Saved (\(viewModel.savedArticleCount))", systemImage: "bookmark.fill")
+                    }
+                    .toggleStyle(.button)
+
+                    if viewModel.hasActiveFilters {
+                        Button("Reset filters") { viewModel.resetFilters() }
+                            .buttonStyle(.borderless)
+                    }
+
+                    Spacer()
+                    Text("\(viewModel.displayedArticles.count) of \(viewModel.snapshot.articles.count) stories")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack(spacing: MyDataDCSpacing.small) {
                     Button {
                         Task { await viewModel.refresh() }
                     } label: {
@@ -93,6 +119,28 @@ public struct NewsDeskView: View {
                     }
                 }
 
+                if !viewModel.sourceStatuses.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: MyDataDCSpacing.small) {
+                            ForEach(viewModel.sourceStatuses) { status in
+                                HStack(spacing: MyDataDCSpacing.xSmall) {
+                                    Circle()
+                                        .fill(sourceColor(for: status.state))
+                                        .frame(width: 7, height: 7)
+                                    Text(status.name)
+                                        .font(.caption.bold())
+                                    Text(status.detail)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .padding(.horizontal, MyDataDCSpacing.small)
+                                .padding(.vertical, MyDataDCSpacing.xSmall)
+                                .background(.thinMaterial, in: Capsule())
+                            }
+                        }
+                    }
+                }
+
                 if let message = viewModel.statusMessage {
                     Text(message)
                         .font(.caption)
@@ -110,17 +158,15 @@ public struct NewsDeskView: View {
     private var emptyState: some View {
         FrostedPanel {
             VStack(spacing: MyDataDCSpacing.medium) {
-                Image(systemName: viewModel.query.isEmpty ? "newspaper" : "magnifyingglass")
+                Image(systemName: viewModel.showsSavedOnly ? "bookmark" : (viewModel.hasActiveFilters ? "line.3.horizontal.decrease.circle" : "newspaper"))
                     .font(.system(size: 42, weight: .semibold))
-                Text(viewModel.query.isEmpty ? "No briefing yet" : "No matching stories")
+                Text(emptyStateTitle)
                     .font(.title2.bold())
-                Text(viewModel.query.isEmpty
-                    ? "NewsDesk will display verified stories after a source is connected."
-                    : "Try another search or clear the current query.")
+                Text(emptyStateMessage)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
-                if !viewModel.query.isEmpty {
-                    Button("Clear Search") { viewModel.clearSearch() }
+                if viewModel.hasActiveFilters {
+                    Button("Reset Filters") { viewModel.resetFilters() }
                         .buttonStyle(.borderedProminent)
                 }
             }
@@ -135,7 +181,7 @@ public struct NewsDeskView: View {
                     Text(article.urgency.rawValue.uppercased())
                         .font(.caption.bold())
                         .foregroundStyle(article.urgency >= .breaking ? .red : .secondary)
-                    Text(article.scope.rawValue.uppercased())
+                    Text(article.scope.displayName.uppercased())
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -161,6 +207,27 @@ public struct NewsDeskView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var emptyStateTitle: String {
+        if viewModel.showsSavedOnly { return "No saved stories" }
+        if viewModel.hasActiveFilters { return "No matching stories" }
+        return "No briefing yet"
+    }
+
+    private var emptyStateMessage: String {
+        if viewModel.showsSavedOnly { return "Save a story with its bookmark button, or reset the filters." }
+        if viewModel.hasActiveFilters { return "Try another scope or search, or reset the filters." }
+        return "Refresh NewsDesk to load the latest stories."
+    }
+
+    private func sourceColor(for state: NewsDeskSourceStatus.State) -> Color {
+        switch state {
+        case .waiting: .gray
+        case .cached: .blue
+        case .updated: .green
+        case .unavailable: .orange
         }
     }
 }

@@ -120,6 +120,13 @@ import NetSphereCore
 
     viewModel.query = "arts"
     #expect(viewModel.displayedArticles.map(\.id) == [routine.id])
+
+    viewModel.query = ""
+    viewModel.selectedScope = .culture
+    #expect(viewModel.displayedArticles.map(\.id) == [routine.id])
+
+    viewModel.resetFilters()
+    #expect(viewModel.displayedArticles.count == 2)
 }
 
 @MainActor
@@ -140,9 +147,11 @@ import NetSphereCore
     await viewModel.load()
     viewModel.clearSearch()
     await viewModel.toggleSaved(article)
+    viewModel.showsSavedOnly = true
 
     #expect(viewModel.query.isEmpty)
     #expect(viewModel.isSaved(article))
+    #expect(viewModel.displayedArticles.map(\.id) == [article.id])
 }
 
 private struct StubNewsFeedLoader: NewsFeedLoading {
@@ -182,5 +191,51 @@ private struct StubNewsFeedLoader: NewsFeedLoading {
     #expect(viewModel.displayedArticles.map(\.headline) == ["A live briefing"])
     #expect(viewModel.briefing != nil)
     #expect(FileManager.default.fileExists(atPath: url.path))
+    #expect(viewModel.errorMessage == nil)
+    #expect(viewModel.sourceStatuses.map(\.state) == [.updated])
+}
+
+private enum StubFeedError: Error { case unavailable }
+
+private struct PartialNewsFeedLoader: NewsFeedLoading {
+    let availableName: String
+    let article: NewsArticle
+
+    func fetch(_ endpoint: NewsFeedEndpoint) async throws -> [NewsArticle] {
+        guard endpoint.name == availableName else { throw StubFeedError.unavailable }
+        return [article]
+    }
+}
+
+@MainActor
+@Test func newsDeskReportsPartialSourceFailureWithoutDiscardingStories() async {
+    let available = NewsFeedEndpoint(
+        name: "Available Wire",
+        url: URL(string: "https://example.com/available.xml")!,
+        scope: .world
+    )
+    let unavailable = NewsFeedEndpoint(
+        name: "Unavailable Wire",
+        url: URL(string: "https://example.com/unavailable.xml")!,
+        scope: .world
+    )
+    let article = NewsArticle(
+        headline: "Still delivered",
+        summary: "One source remained available.",
+        scope: .world,
+        source: NewsSource(name: available.name, domain: "example.com", reliabilityScore: 0.8),
+        publishedAt: Date(timeIntervalSince1970: 40_000)
+    )
+    let viewModel = NewsDeskViewModel(
+        feedLoader: PartialNewsFeedLoader(availableName: available.name, article: article),
+        endpoints: [available, unavailable],
+        persistenceURL: nil
+    )
+
+    await viewModel.refresh()
+
+    #expect(viewModel.displayedArticles.map(\.headline) == ["Still delivered"])
+    #expect(viewModel.sourceStatuses.map(\.state) == [.updated, .unavailable])
+    #expect(viewModel.statusMessage?.contains("Unavailable Wire") == true)
     #expect(viewModel.errorMessage == nil)
 }

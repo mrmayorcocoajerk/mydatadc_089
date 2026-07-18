@@ -3,13 +3,47 @@ import Foundation
 import SwiftUI
 import NetSphereCore
 
+public struct NewsDeskSourceStatus: Identifiable, Equatable, Sendable {
+    public enum State: Equatable, Sendable {
+        case waiting
+        case cached
+        case updated
+        case unavailable
+    }
+
+    public var id: URL { endpointURL }
+    public let endpointURL: URL
+    public let name: String
+    public let state: State
+    public let storyCount: Int
+
+    public init(endpoint: NewsFeedEndpoint, state: State, storyCount: Int = 0) {
+        self.endpointURL = endpoint.url
+        self.name = endpoint.name
+        self.state = state
+        self.storyCount = storyCount
+    }
+
+    public var detail: String {
+        switch state {
+        case .waiting: "Waiting"
+        case .cached: "\(storyCount) cached"
+        case .updated: "\(storyCount) new"
+        case .unavailable: "Unavailable"
+        }
+    }
+}
+
 @MainActor
 public final class NewsDeskViewModel: ObservableObject {
     @Published public var query: String
+    @Published public var selectedScope: NewsScope?
+    @Published public var showsSavedOnly: Bool
     @Published public private(set) var snapshot: NetSphereSnapshot
     @Published public private(set) var isRefreshing = false
     @Published public private(set) var statusMessage: String?
     @Published public private(set) var errorMessage: String?
+    @Published public private(set) var sourceStatuses: [NewsDeskSourceStatus]
 
     private let store: NetSphereStore
     private let feedLoader: any NewsFeedLoading
@@ -19,16 +53,21 @@ public final class NewsDeskViewModel: ObservableObject {
     public init(
         store: NetSphereStore = NetSphereStore(),
         query: String = "",
+        selectedScope: NewsScope? = nil,
+        showsSavedOnly: Bool = false,
         feedLoader: any NewsFeedLoading = RSSNewsFeedClient(),
         endpoints: [NewsFeedEndpoint] = NewsFeedEndpoint.newsDeskDefaults,
         persistenceURL: URL? = NewsDeskViewModel.defaultPersistenceURL
     ) {
         self.store = store
         self.query = query
+        self.selectedScope = selectedScope
+        self.showsSavedOnly = showsSavedOnly
         self.feedLoader = feedLoader
         self.endpoints = endpoints
         self.persistenceURL = persistenceURL
         self.snapshot = NetSphereSnapshot()
+        self.sourceStatuses = endpoints.map { NewsDeskSourceStatus(endpoint: $0, state: .waiting) }
     }
 
     public var displayedArticles: [NewsArticle] {
@@ -37,7 +76,22 @@ public final class NewsDeskViewModel: ObservableObject {
             subscriptions: snapshot.subscriptions
         )
         .filter { NetSphereEngine.matches($0, query: query) }
+        .filter { selectedScope == nil || $0.scope == selectedScope }
+        .filter { !showsSavedOnly || snapshot.savedArticleIDs.contains($0.id) }
     }
+
+    public var availableScopes: [NewsScope] {
+        let scopes = Set(snapshot.articles.map(\.scope))
+        return NewsScope.allCases.filter(scopes.contains)
+    }
+
+    public var hasActiveFilters: Bool {
+        !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || selectedScope != nil
+            || showsSavedOnly
+    }
+
+    public var savedArticleCount: Int { snapshot.savedArticleIDs.count }
 
     public var briefing: DailyBriefing? {
         snapshot.lastBriefing
@@ -52,6 +106,14 @@ public final class NewsDeskViewModel: ObservableObject {
             }
         }
         snapshot = await store.currentSnapshot()
+        sourceStatuses = endpoints.map { endpoint in
+            let count = snapshot.articles.filter { $0.source.name == endpoint.name }.count
+            return NewsDeskSourceStatus(
+                endpoint: endpoint,
+                state: count == 0 ? .waiting : .cached,
+                storyCount: count
+            )
+        }
     }
 
     public func refresh() async {
@@ -63,13 +125,22 @@ public final class NewsDeskViewModel: ObservableObject {
 
         var fetched: [NewsArticle] = []
         var failures: [String] = []
+        var refreshedStatuses: [NewsDeskSourceStatus] = []
         for endpoint in endpoints {
             do {
-                fetched += try await feedLoader.fetch(endpoint)
+                let articles = try await feedLoader.fetch(endpoint)
+                fetched += articles
+                refreshedStatuses.append(NewsDeskSourceStatus(
+                    endpoint: endpoint,
+                    state: .updated,
+                    storyCount: articles.count
+                ))
             } catch {
                 failures.append(endpoint.name)
+                refreshedStatuses.append(NewsDeskSourceStatus(endpoint: endpoint, state: .unavailable))
             }
         }
+        sourceStatuses = refreshedStatuses
 
         guard !fetched.isEmpty else {
             errorMessage = failures.isEmpty
@@ -89,6 +160,12 @@ public final class NewsDeskViewModel: ObservableObject {
 
     public func clearSearch() {
         query = ""
+    }
+
+    public func resetFilters() {
+        query = ""
+        selectedScope = nil
+        showsSavedOnly = false
     }
 
     public func isSaved(_ article: NewsArticle) -> Bool {
