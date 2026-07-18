@@ -33,9 +33,10 @@ public actor NetSphereStore {
     @discardableResult
     public func pruneArticles(olderThan cutoff: Date, preservingSaved: Bool = true) -> Int {
         let originalCount = snapshot.articles.count
+        let savedArticleIDs = snapshot.savedArticleIDs
         snapshot.articles.removeAll { article in
             article.publishedAt < cutoff
-                && (!preservingSaved || !snapshot.savedArticleIDs.contains(article.id))
+                && (!preservingSaved || !savedArticleIDs.contains(article.id))
         }
         let retainedIDs = Set(snapshot.articles.map(\.id))
         snapshot.savedArticleIDs.formIntersection(retainedIDs)

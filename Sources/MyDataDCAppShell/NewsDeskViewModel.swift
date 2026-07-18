@@ -164,8 +164,11 @@ public final class NewsDeskViewModel: ObservableObject {
                 errorMessage = "Saved briefing could not be loaded: \(error.localizedDescription)"
             }
         }
-        let cutoff = Date().addingTimeInterval(-Self.articleRetentionInterval)
-        let removedCount = await store.pruneArticles(olderThan: cutoff)
+        let storedSnapshot = await store.currentSnapshot()
+        var removedCount = 0
+        if storedSnapshot.lastBriefing != nil {
+            removedCount = await pruneStaleArticles()
+        }
         if removedCount > 0 {
             await store.generateBriefing()
             await persist()
@@ -212,10 +215,10 @@ public final class NewsDeskViewModel: ObservableObject {
                 ? "No headlines were returned."
                 : "Could not refresh: \(failures.joined(separator: ", "))."
             return
-        }
+        }                                           
 
+        _ = await pruneStaleArticles()
         await store.ingest(fetched)
-        await store.pruneArticles(olderThan: Date().addingTimeInterval(-Self.articleRetentionInterval))
         await store.generateBriefing()
         await persist()
         snapshot = await store.currentSnapshot()
@@ -309,6 +312,11 @@ public final class NewsDeskViewModel: ObservableObject {
         await store.generateBriefing()
         await persist()
         snapshot = await store.currentSnapshot()
+    }
+
+    private func pruneStaleArticles() async -> Int {
+        let cutoff = Date().addingTimeInterval(-Self.articleRetentionInterval)
+        return await store.pruneArticles(olderThan: cutoff)
     }
 
     public static var defaultPersistenceURL: URL? {

@@ -55,14 +55,27 @@ public actor MoneyHQStore {
     public func save(to url: URL) throws {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        encoder.dateEncodingStrategy = .custom { date, encoder in
+            var container = encoder.singleValueContainer()
+            try container.encode(date.timeIntervalSinceReferenceDate)
+        }
         try encoder.encode(snapshot).write(to: url, options: .atomic)
     }
 
     public func load(from url: URL) throws {
         guard FileManager.default.fileExists(atPath: url.path) else { return }
+        let data = try Data(contentsOf: url)
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        snapshot = try decoder.decode(MoneyHQSnapshot.self, from: Data(contentsOf: url))
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            return Date(timeIntervalSinceReferenceDate: try container.decode(Double.self))
+        }
+        do {
+            snapshot = try decoder.decode(MoneyHQSnapshot.self, from: data)
+        } catch {
+            let legacyDecoder = JSONDecoder()
+            legacyDecoder.dateDecodingStrategy = .iso8601
+            snapshot = try legacyDecoder.decode(MoneyHQSnapshot.self, from: data)
+        }
     }
 }
