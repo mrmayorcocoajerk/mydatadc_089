@@ -20,6 +20,17 @@ import MyDataDCCore
 }
 
 @MainActor
+@Test func appStateCanClearModuleSearch() {
+    let state = MyDataDCNavigationModel(searchText: "financial")
+    #expect(state.visibleModules.map(\.id) == [.moneyHQ])
+
+    state.clearSearch()
+
+    #expect(state.searchText.isEmpty)
+    #expect(state.visibleModules.count == ModuleRegistry.defaults.filter(\.isEnabled).count)
+}
+
+@MainActor
 @Test func disabledModuleCannotRemainSelected() async throws {
     let state = MyDataDCNavigationModel(selectedModuleID: .newsDesk)
     try await state.setEnabled(false, for: .newsDesk)

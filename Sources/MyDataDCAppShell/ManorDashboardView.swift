@@ -13,6 +13,10 @@ public struct ManorDashboardView: View {
         [GridItem(.adaptive(minimum: 220, maximum: 360), spacing: MyDataDCSpacing.medium)]
     }
 
+    private var dashboardModules: [MyDataDCModule] {
+        state.visibleModules.filter { $0.id != .manor }
+    }
+
     public var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
@@ -24,13 +28,17 @@ public struct ManorDashboardView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: MyDataDCSpacing.xLarge) {
                     header
-                    LazyVGrid(columns: columns, spacing: MyDataDCSpacing.medium) {
-                        ForEach(state.visibleModules.filter { $0.id != .manor }) { module in
-                            ModuleCardView(
-                                module: module,
-                                isSelected: state.selectedModuleID == module.id
-                            ) {
-                                state.select(module.id)
+                    if dashboardModules.isEmpty {
+                        emptySearchState
+                    } else {
+                        LazyVGrid(columns: columns, spacing: MyDataDCSpacing.medium) {
+                            ForEach(dashboardModules) { module in
+                                ModuleCardView(
+                                    module: module,
+                                    isSelected: state.selectedModuleID == module.id
+                                ) {
+                                    state.select(module.id)
+                                }
                             }
                         }
                     }
@@ -38,7 +46,6 @@ public struct ManorDashboardView: View {
                 .padding(MyDataDCSpacing.xLarge)
             }
         }
-        .searchable(text: $state.searchText, prompt: "Search The Manor")
         .task { await state.load() }
     }
 
@@ -59,8 +66,40 @@ public struct ManorDashboardView: View {
                             endPoint: .bottomTrailing
                         )
                     )
+                HStack(spacing: MyDataDCSpacing.small) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(.secondary)
+                    TextField("Search The Manor", text: $state.searchText)
+                        .textFieldStyle(.roundedBorder)
+                    if !state.searchText.isEmpty {
+                        Button("Clear") {
+                            state.clearSearch()
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                }
+                .frame(maxWidth: 520)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var emptySearchState: some View {
+        FrostedPanel {
+            VStack(spacing: MyDataDCSpacing.medium) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 36, weight: .semibold))
+                Text("No modules found")
+                    .font(.title2.bold())
+                Text("Try another search or clear the current query.")
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                Button("Clear Search") {
+                    state.clearSearch()
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            .frame(maxWidth: .infinity, minHeight: 220)
         }
     }
 }

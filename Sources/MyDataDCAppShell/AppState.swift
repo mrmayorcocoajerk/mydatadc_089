@@ -51,6 +51,10 @@ public final class MyDataDCNavigationModel {
         select(.manor)
     }
 
+    public func clearSearch() {
+        searchText = ""
+    }
+
     public func setEnabled(_ enabled: Bool, for id: MyDataDCModuleID) async throws {
         try await registry.setEnabled(enabled, for: id)
         await load()
@@ -109,6 +113,11 @@ public final class MyDataDCAppState: ObservableObject {
 
     public func returnToManor() {
         model.returnToManor()
+        synchronize()
+    }
+
+    public func clearSearch() {
+        model.clearSearch()
         synchronize()
     }
 
