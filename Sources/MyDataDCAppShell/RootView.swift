@@ -28,6 +28,10 @@ public struct MyDataDCRootView: View {
                 ManorDashboardView(state: state)
             } else if state.selectedModuleID == .careerHQ {
                 CareerHQView()
+            } else if state.selectedModuleID == .newsDesk {
+                NewsDeskView {
+                    state.returnToManor()
+                }
             } else if let module = state.selectedModule {
                 ModuleWorkspaceView(module: module) {
                     state.returnToManor()
