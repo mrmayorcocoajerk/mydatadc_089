@@ -30,6 +30,52 @@ import MoneyHQCore
 }
 
 @MainActor
+@Test func moneyHQAddsAndCalculatesABudget() async throws {
+    let account = MoneyAccount(name: "Checking", kind: .checking)
+    let viewModel = MoneyHQViewModel(
+        store: MoneyHQStore(snapshot: .init(accounts: [account])),
+        persistenceURL: nil
+    )
+    try await viewModel.addBudget(category: "Food", monthlyLimit: 300)
+    try await viewModel.addTransaction(
+        accountID: account.id,
+        payee: "Market",
+        category: "Food",
+        amount: 45,
+        isIncome: false,
+        date: Date(),
+        isPending: false
+    )
+
+    #expect(viewModel.budgetProgress.first?.spent == 45)
+    #expect(viewModel.budgetProgress.first?.remaining == 255)
+}
+
+@MainActor
+@Test func moneyHQCanClearAndDeleteATransaction() async throws {
+    let account = MoneyAccount(name: "Checking", kind: .checking)
+    let transaction = MoneyTransaction(
+        accountID: account.id,
+        payee: "Market",
+        category: "Food",
+        amount: -30,
+        isPending: true
+    )
+    let viewModel = MoneyHQViewModel(
+        store: MoneyHQStore(snapshot: .init(accounts: [account], transactions: [transaction])),
+        persistenceURL: nil
+    )
+    await viewModel.load()
+
+    try await viewModel.setPending(transactionID: transaction.id, isPending: false)
+    #expect(viewModel.snapshot.transactions.first?.isPending == false)
+
+    try await viewModel.deleteTransaction(id: transaction.id)
+    #expect(viewModel.snapshot.transactions.isEmpty)
+    #expect(viewModel.balances[account.id] == 0)
+}
+
+@MainActor
 @Test func appStateStartsAtTheManor() {
     let state = MyDataDCNavigationModel()
     #expect(state.selectedModuleID == .manor)

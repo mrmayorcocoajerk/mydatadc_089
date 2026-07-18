@@ -26,6 +26,7 @@ public final class MoneyHQViewModel: ObservableObject {
     public var summary: MoneyHQSummary { MoneyHQEngine.summary(for: snapshot) }
     public var balances: [UUID: Decimal] { MoneyHQEngine.balances(in: snapshot) }
     public var recentTransactions: [MoneyTransaction] { MoneyHQEngine.recentTransactions(in: snapshot) }
+    public var budgetProgress: [MoneyBudgetProgress] { MoneyHQEngine.budgetProgress(in: snapshot) }
 
     public func load() async {
         do {
@@ -67,6 +68,24 @@ public final class MoneyHQViewModel: ObservableObject {
             amount: signedAmount,
             isPending: isPending
         ))
+        try await synchronizeAndSave()
+    }
+
+    public func addBudget(category: String, monthlyLimit: Decimal) async throws {
+        try await store.upsert(MoneyBudget(
+            category: category.trimmingCharacters(in: .whitespacesAndNewlines),
+            monthlyLimit: abs(monthlyLimit)
+        ))
+        try await synchronizeAndSave()
+    }
+
+    public func setPending(transactionID: UUID, isPending: Bool) async throws {
+        try await store.setPending(transactionID: transactionID, isPending: isPending)
+        try await synchronizeAndSave()
+    }
+
+    public func deleteTransaction(id: UUID) async throws {
+        try await store.deleteTransaction(id: id)
         try await synchronizeAndSave()
     }
 

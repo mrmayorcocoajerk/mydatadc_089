@@ -83,13 +83,62 @@ public struct MoneyTransaction: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
+public struct MoneyBudget: Identifiable, Codable, Equatable, Sendable {
+    public let id: UUID
+    public var category: String
+    public var monthlyLimit: Decimal
+    public var isActive: Bool
+
+    public init(id: UUID = UUID(), category: String, monthlyLimit: Decimal, isActive: Bool = true) {
+        self.id = id
+        self.category = category
+        self.monthlyLimit = monthlyLimit
+        self.isActive = isActive
+    }
+}
+
 public struct MoneyHQSnapshot: Codable, Equatable, Sendable {
     public var accounts: [MoneyAccount]
     public var transactions: [MoneyTransaction]
+    public var budgets: [MoneyBudget]
 
-    public init(accounts: [MoneyAccount] = [], transactions: [MoneyTransaction] = []) {
+    public init(
+        accounts: [MoneyAccount] = [],
+        transactions: [MoneyTransaction] = [],
+        budgets: [MoneyBudget] = []
+    ) {
         self.accounts = accounts
         self.transactions = transactions
+        self.budgets = budgets
+    }
+
+    private enum CodingKeys: String, CodingKey { case accounts, transactions, budgets }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        accounts = try container.decodeIfPresent([MoneyAccount].self, forKey: .accounts) ?? []
+        transactions = try container.decodeIfPresent([MoneyTransaction].self, forKey: .transactions) ?? []
+        budgets = try container.decodeIfPresent([MoneyBudget].self, forKey: .budgets) ?? []
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(accounts, forKey: .accounts)
+        try container.encode(transactions, forKey: .transactions)
+        try container.encode(budgets, forKey: .budgets)
+    }
+}
+
+public struct MoneyBudgetProgress: Identifiable, Equatable, Sendable {
+    public let budget: MoneyBudget
+    public let spent: Decimal
+
+    public var id: UUID { budget.id }
+    public var remaining: Decimal { max(0, budget.monthlyLimit - spent) }
+    public var isOverBudget: Bool { spent > budget.monthlyLimit }
+    public var fractionUsed: Double {
+        guard budget.monthlyLimit > 0 else { return 0 }
+        return min(1, max(0, NSDecimalNumber(decimal: spent / budget.monthlyLimit).doubleValue))
     }
 }
 
@@ -112,4 +161,6 @@ public struct MoneyHQSummary: Equatable, Sendable {
 public enum MoneyHQError: Error, Equatable, Sendable {
     case unknownAccount
     case zeroAmount
+    case invalidBudgetLimit
+    case unknownTransaction
 }

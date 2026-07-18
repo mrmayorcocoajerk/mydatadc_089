@@ -25,7 +25,30 @@ public actor MoneyHQStore {
         snapshot.transactions.append(transaction)
     }
 
-    public func deleteTransaction(id: UUID) {
+    public func upsert(_ budget: MoneyBudget) throws {
+        guard budget.monthlyLimit > 0 else { throw MoneyHQError.invalidBudgetLimit }
+        if let index = snapshot.budgets.firstIndex(where: { $0.id == budget.id }) {
+            snapshot.budgets[index] = budget
+        } else {
+            snapshot.budgets.append(budget)
+        }
+    }
+
+    public func deleteBudget(id: UUID) {
+        snapshot.budgets.removeAll { $0.id == id }
+    }
+
+    public func setPending(transactionID: UUID, isPending: Bool) throws {
+        guard let index = snapshot.transactions.firstIndex(where: { $0.id == transactionID }) else {
+            throw MoneyHQError.unknownTransaction
+        }
+        snapshot.transactions[index].isPending = isPending
+    }
+
+    public func deleteTransaction(id: UUID) throws {
+        guard snapshot.transactions.contains(where: { $0.id == id }) else {
+            throw MoneyHQError.unknownTransaction
+        }
         snapshot.transactions.removeAll { $0.id == id }
     }
 

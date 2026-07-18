@@ -33,4 +33,25 @@ public enum MoneyHQEngine {
     public static func recentTransactions(in snapshot: MoneyHQSnapshot, limit: Int = 20) -> [MoneyTransaction] {
         Array(snapshot.transactions.sorted { $0.date > $1.date }.prefix(limit))
     }
+
+    public static func budgetProgress(
+        in snapshot: MoneyHQSnapshot,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> [MoneyBudgetProgress] {
+        let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: now)) ?? .distantPast
+        return snapshot.budgets
+            .filter(\.isActive)
+            .map { budget in
+                let spent = snapshot.transactions.lazy
+                    .filter {
+                        $0.date >= monthStart && $0.date <= now
+                            && $0.amount < 0
+                            && $0.category.localizedCaseInsensitiveCompare(budget.category) == .orderedSame
+                    }
+                    .reduce(Decimal.zero) { $0 + -$1.amount }
+                return MoneyBudgetProgress(budget: budget, spent: spent)
+            }
+            .sorted { $0.budget.category.localizedCaseInsensitiveCompare($1.budget.category) == .orderedAscending }
+    }
 }

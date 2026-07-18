@@ -5,6 +5,7 @@ import MoneyHQCore
 public struct MoneyHQView: View {
     @StateObject private var viewModel: MoneyHQViewModel
     @State private var sheet: MoneyHQSheet?
+    @State private var transactionToDelete: MoneyTransaction?
     private let onReturnToManor: () -> Void
 
     public init(
@@ -22,6 +23,7 @@ public struct MoneyHQView: View {
                 VStack(alignment: .leading, spacing: MyDataDCSpacing.large) {
                     header
                     summaryGrid
+                    budgetsPanel
                     accountsPanel
                     ledgerPanel
                 }
@@ -36,7 +38,25 @@ public struct MoneyHQView: View {
                 AddMoneyAccountView(viewModel: viewModel)
             case .transaction:
                 AddMoneyTransactionView(viewModel: viewModel)
+            case .budget:
+                AddMoneyBudgetView(viewModel: viewModel)
             }
+        }
+        .alert(
+            "Delete transaction?",
+            isPresented: Binding(
+                get: { transactionToDelete != nil },
+                set: { if !$0 { transactionToDelete = nil } }
+            ),
+            presenting: transactionToDelete
+        ) { transaction in
+            Button("Cancel", role: .cancel) { transactionToDelete = nil }
+            Button("Delete", role: .destructive) {
+                transactionToDelete = nil
+                Task { try? await viewModel.deleteTransaction(id: transaction.id) }
+            }
+        } message: { transaction in
+            Text("This removes \(transaction.payee.isEmpty ? transaction.category : transaction.payee) from the local ledger.")
         }
     }
 
@@ -102,6 +122,44 @@ public struct MoneyHQView: View {
         }
     }
 
+    private var budgetsPanel: some View {
+        FrostedPanel {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    Text("Monthly Budgets").font(.title2.bold())
+                    Spacer()
+                    Button("Add Budget", systemImage: "plus") { sheet = .budget }
+                }
+                if viewModel.budgetProgress.isEmpty {
+                    ContentUnavailableView(
+                        "No budgets yet",
+                        systemImage: "target",
+                        description: Text("Set a category limit to track this month's spending.")
+                    )
+                } else {
+                    ForEach(viewModel.budgetProgress) { progress in
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text(progress.budget.category).font(.headline)
+                                Spacer()
+                                Text("\(currency(progress.spent)) of \(currency(progress.budget.monthlyLimit))")
+                                    .font(.subheadline).monospacedDigit()
+                            }
+                            ProgressView(value: progress.fractionUsed)
+                                .tint(progress.isOverBudget ? Color.red : Color.cyan)
+                            Text(progress.isOverBudget
+                                 ? "Over by \(currency(progress.spent - progress.budget.monthlyLimit))"
+                                 : "\(currency(progress.remaining)) remaining")
+                                .font(.caption)
+                                .foregroundStyle(progress.isOverBudget ? Color.red : Color.secondary)
+                        }
+                        Divider()
+                    }
+                }
+            }
+        }
+    }
+
     private var ledgerPanel: some View {
         FrostedPanel {
             VStack(alignment: .leading, spacing: 14) {
@@ -126,6 +184,25 @@ public struct MoneyHQView: View {
                             Text(currency(transaction.amount))
                                 .foregroundStyle(transaction.amount < 0 ? Color.primary : Color.green)
                                 .monospacedDigit()
+                            Menu {
+                                Button(
+                                    transaction.isPending ? "Mark Cleared" : "Mark Pending",
+                                    systemImage: transaction.isPending ? "checkmark.circle" : "clock"
+                                ) {
+                                    Task {
+                                        try? await viewModel.setPending(
+                                            transactionID: transaction.id,
+                                            isPending: !transaction.isPending
+                                        )
+                                    }
+                                }
+                                Divider()
+                                Button("Delete", systemImage: "trash", role: .destructive) {
+                                    transactionToDelete = transaction
+                                }
+                            } label: {
+                                Image(systemName: "ellipsis.circle")
+                            }
                         }
                         Divider()
                     }
@@ -140,8 +217,48 @@ public struct MoneyHQView: View {
 }
 
 private enum MoneyHQSheet: String, Identifiable {
-    case account, transaction
+    case account, transaction, budget
     var id: String { rawValue }
+}
+
+private struct AddMoneyBudgetView: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject var viewModel: MoneyHQViewModel
+    @State private var category = ""
+    @State private var limit = ""
+    @State private var errorMessage: String?
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextField("Category, such as Food", text: $category)
+                TextField("Monthly limit", text: $limit)
+                if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
+            }
+            .navigationTitle("Add Budget")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { save() }
+                        .disabled(category.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+        .frame(minWidth: 420, minHeight: 240)
+    }
+
+    private func save() {
+        guard let value = Decimal(string: limit.replacingOccurrences(of: ",", with: "")), value > 0 else {
+            errorMessage = "Enter a monthly limit greater than zero."
+            return
+        }
+        Task {
+            do {
+                try await viewModel.addBudget(category: category, monthlyLimit: value)
+                dismiss()
+            } catch { errorMessage = "The budget could not be saved." }
+        }
+    }
 }
 
 private struct AddMoneyAccountView: View {

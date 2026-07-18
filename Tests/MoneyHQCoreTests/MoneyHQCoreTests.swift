@@ -53,3 +53,59 @@ import Testing
     let sourceSnapshot = await source.currentSnapshot()
     #expect(restoredSnapshot == sourceSnapshot)
 }
+
+@Test func budgetsTrackCurrentMonthCategorySpending() {
+    let calendar = Calendar(identifier: .gregorian)
+    let now = Date(timeIntervalSince1970: 1_736_942_400)
+    let account = MoneyAccount(name: "Checking", kind: .checking)
+    let budget = MoneyBudget(category: "Food", monthlyLimit: 200)
+    let snapshot = MoneyHQSnapshot(
+        accounts: [account],
+        transactions: [
+            MoneyTransaction(accountID: account.id, date: now, payee: "Market", category: "food", amount: -75),
+            MoneyTransaction(accountID: account.id, date: now, payee: "Payroll", category: "Income", amount: 500)
+        ],
+        budgets: [budget]
+    )
+
+    let progress = MoneyHQEngine.budgetProgress(in: snapshot, now: now, calendar: calendar)
+    #expect(progress.first?.spent == 75)
+    #expect(progress.first?.remaining == 125)
+    #expect(progress.first?.isOverBudget == false)
+}
+
+@Test func olderLedgerWithoutBudgetsStillDecodes() throws {
+    let data = Data(#"{"accounts":[],"transactions":[]}"#.utf8)
+    let snapshot = try JSONDecoder().decode(MoneyHQSnapshot.self, from: data)
+    #expect(snapshot.budgets.isEmpty)
+}
+
+@Test func storeRejectsInvalidBudgetLimits() async {
+    let store = MoneyHQStore()
+    await #expect(throws: MoneyHQError.invalidBudgetLimit) {
+        try await store.upsert(MoneyBudget(category: "Food", monthlyLimit: 0))
+    }
+}
+
+@Test func storeUpdatesAndDeletesTransactions() async throws {
+    let account = MoneyAccount(name: "Checking", kind: .checking)
+    let transaction = MoneyTransaction(
+        accountID: account.id,
+        payee: "Market",
+        category: "Food",
+        amount: -25,
+        isPending: true
+    )
+    let store = MoneyHQStore(snapshot: .init(accounts: [account], transactions: [transaction]))
+
+    try await store.setPending(transactionID: transaction.id, isPending: false)
+    var snapshot = await store.currentSnapshot()
+    #expect(snapshot.transactions.first?.isPending == false)
+
+    try await store.deleteTransaction(id: transaction.id)
+    snapshot = await store.currentSnapshot()
+    #expect(snapshot.transactions.isEmpty)
+    await #expect(throws: MoneyHQError.unknownTransaction) {
+        try await store.deleteTransaction(id: transaction.id)
+    }
+}
