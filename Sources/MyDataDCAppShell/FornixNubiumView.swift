@@ -1,6 +1,7 @@
 #if canImport(SwiftUI)
 import Foundation
 import SwiftUI
+import UniformTypeIdentifiers
 import FornixNubiumCore
 
 public struct FornixNubiumView: View {
@@ -14,13 +15,19 @@ public struct FornixNubiumView: View {
     }
 
     private let onReturnToManor: () -> Void
+    private let store: FornixNubiumStore
     @State private var query = ""
     @State private var collection: Collection = .all
-    @State private var assets: [FornixAsset]
+    @State private var assets: [FornixAsset] = []
+    @State private var isImporting = false
+    @State private var isWorking = false
+    @State private var statusMessage: String?
 
     public init(onReturnToManor: @escaping () -> Void = {}) {
         self.onReturnToManor = onReturnToManor
-        _assets = State(initialValue: Self.previewAssets)
+        self.store = FornixNubiumStore(
+            persistenceURL: FornixNubiumStore.defaultPersistenceURL
+        )
     }
 
     private var duplicateIDs: Set<UUID> {
@@ -51,6 +58,14 @@ public struct FornixNubiumView: View {
             }
         }
         .navigationTitle("Fornix Nūbium")
+        .task { await loadLibrary() }
+        .fileImporter(
+            isPresented: $isImporting,
+            allowedContentTypes: [.item],
+            allowsMultipleSelection: true
+        ) { result in
+            Task { await handleImport(result) }
+        }
     }
 
     private var header: some View {
@@ -66,8 +81,18 @@ public struct FornixNubiumView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            Button("Reindex", systemImage: "arrow.triangle.2.circlepath") {
+                Task { await reindexLibrary() }
+            }
+            .buttonStyle(.bordered)
+            .disabled(isWorking || assets.isEmpty)
+            Button("Import Files", systemImage: "plus") {
+                isImporting = true
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(isWorking)
             Button("The Manor", systemImage: "building.columns.fill", action: onReturnToManor)
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.bordered)
         }
     }
 
@@ -106,9 +131,27 @@ public struct FornixNubiumView: View {
                 TextField("Search names, folders, formats, and tags", text: $query)
                     .textFieldStyle(.roundedBorder)
 
+                if let statusMessage {
+                    Label(statusMessage, systemImage: isWorking ? "hourglass" : "checkmark.circle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
                 if displayedAssets.isEmpty {
-                    ContentUnavailableView.search(text: query)
-                        .frame(maxWidth: .infinity, minHeight: 220)
+                    if assets.isEmpty && query.isEmpty {
+                        ContentUnavailableView {
+                            Label("Your library is ready", systemImage: "externaldrive.badge.plus")
+                        } description: {
+                            Text("Import files to create a private, searchable catalog. Your original files stay where they are.")
+                        } actions: {
+                            Button("Import Files") { isImporting = true }
+                                .buttonStyle(.borderedProminent)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 240)
+                    } else {
+                        ContentUnavailableView.search(text: query)
+                            .frame(maxWidth: .infinity, minHeight: 220)
+                    }
                 } else {
                     VStack(spacing: 0) {
                         ForEach(displayedAssets) { asset in
@@ -142,14 +185,18 @@ public struct FornixNubiumView: View {
                 .font(.callout.monospacedDigit())
                 .foregroundStyle(.secondary)
             Button {
-                guard let index = assets.firstIndex(where: { $0.id == asset.id }) else { return }
-                assets[index].isFavorite.toggle()
+                Task { await toggleFavorite(asset) }
             } label: {
                 Image(systemName: asset.isFavorite ? "star.fill" : "star")
             }
             .buttonStyle(.plain)
         }
         .padding(.vertical, MyDataDCSpacing.small)
+        .contextMenu {
+            Button(asset.isArchived ? "Return to Library" : "Move to Archive") {
+                Task { await toggleArchived(asset) }
+            }
+        }
     }
 
     private func metadata(for asset: FornixAsset) -> String {
@@ -158,12 +205,71 @@ public struct FornixNubiumView: View {
         return tags.isEmpty ? folderName : "\(folderName)  •  \(tags)"
     }
 
-    private static let previewAssets: [FornixAsset] = [
-        .init(name: "Mayor Portrait.heic", kind: .photo, byteCount: 8_400_000, fingerprint: "portrait-master", tags: ["portrait", "manor"], folderName: "Photography", isFavorite: true),
-        .init(name: "Mayor Portrait Copy.heic", kind: .photo, byteCount: 8_400_000, fingerprint: "portrait-master", tags: ["duplicate", "portrait"], folderName: "Imports"),
-        .init(name: "Fornix Nūbium Brief.pdf", kind: .document, byteCount: 2_650_000, fingerprint: "brief-v3", tags: ["strategy", "cloud"], folderName: "Projects", isFavorite: true),
-        .init(name: "Studio Session 07.wav", kind: .audio, byteCount: 184_000_000, fingerprint: "studio-session-07", tags: ["music", "master"], folderName: "ongaku(studio)"),
-        .init(name: "Legacy Export.zip", kind: .archive, byteCount: 92_000_000, fingerprint: "legacy-export", tags: ["cold storage"], folderName: "Archive", isArchived: true)
-    ]
+    @MainActor
+    private func loadLibrary() async {
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            try await store.load()
+            await refreshSnapshot()
+            statusMessage = assets.isEmpty
+                ? "No files imported yet."
+                : "Loaded \(assets.count.formatted()) files."
+        } catch {
+            statusMessage = "Could not load the library: \(error.localizedDescription)"
+        }
+    }
+
+    @MainActor
+    private func handleImport(_ result: Result<[URL], any Error>) async {
+        do {
+            let urls = try result.get()
+            let scopedURLs = urls.map { ($0, $0.startAccessingSecurityScopedResource()) }
+            defer {
+                for (url, didAccess) in scopedURLs where didAccess {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
+
+            isWorking = true
+            let imported = try await store.importFiles(urls)
+            await refreshSnapshot()
+            statusMessage = "Imported \(imported.count.formatted()) files."
+            isWorking = false
+        } catch {
+            isWorking = false
+            statusMessage = "Import failed: \(error.localizedDescription)"
+        }
+    }
+
+    @MainActor
+    private func reindexLibrary() async {
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            let refreshed = try await store.reindex()
+            await refreshSnapshot()
+            statusMessage = "Reindexed \(refreshed.formatted()) files."
+        } catch {
+            statusMessage = "Reindex failed: \(error.localizedDescription)"
+        }
+    }
+
+    @MainActor
+    private func toggleFavorite(_ asset: FornixAsset) async {
+        await store.setFavorite(!asset.isFavorite, for: asset.id)
+        await refreshSnapshot()
+    }
+
+    @MainActor
+    private func toggleArchived(_ asset: FornixAsset) async {
+        await store.setArchived(!asset.isArchived, for: asset.id)
+        await refreshSnapshot()
+    }
+
+    @MainActor
+    private func refreshSnapshot() async {
+        assets = await store.currentSnapshot().assets
+    }
 }
 #endif
