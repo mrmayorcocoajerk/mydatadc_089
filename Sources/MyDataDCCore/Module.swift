@@ -5,6 +5,7 @@ public enum MyDataDCModuleID: String, CaseIterable, Codable, Sendable {
     case ongakuStudio
     case chosenMeiga
     case shashinTeki
+    case fornixNubium
     case careerHQ
     case moneyHQ
     case vitalsStudio

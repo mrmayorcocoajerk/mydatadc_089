@@ -30,6 +30,7 @@ public actor ModuleRegistry {
         .init(id: .ongakuStudio, displayName: "ongaku(studio)", subtitle: "Music creation and mastering", systemImage: "waveform.badge.mic"),
         .init(id: .chosenMeiga, displayName: "chō(sen)mei(ga)", subtitle: "Video editing and production", systemImage: "film.stack.fill"),
         .init(id: .shashinTeki, displayName: "shashin(teki)", subtitle: "AI photo editing studio", systemImage: "camera.filters"),
+        .init(id: .fornixNubium, displayName: "Fornix Nūbium", subtitle: "Private cloud, intelligent storage, and archive", systemImage: "externaldrive.fill"),
         .init(id: .careerHQ, displayName: "Career HQ", subtitle: "Applications, opportunities, and growth", systemImage: "briefcase.fill"),
         .init(id: .moneyHQ, displayName: "Money HQ", subtitle: "Financial command center", systemImage: "chart.pie.fill"),
         .init(id: .vitalsStudio, displayName: "Vitals Studio", subtitle: "Health, activity, and wellbeing", systemImage: "heart.text.square.fill"),

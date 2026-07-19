@@ -22,14 +22,15 @@ let package = Package(
         .library(name: "NetSphereCore", targets: ["NetSphereCore"]),
         .library(name: "MoneyHQCore", targets: ["MoneyHQCore"]),
         .library(name: "VitalsCore", targets: ["VitalsCore"]),
-        .library(name: "TimeCore", targets: ["TimeCore"])
+        .library(name: "TimeCore", targets: ["TimeCore"]),
+        .library(name: "FornixNubiumCore", targets: ["FornixNubiumCore"])
     ],
     targets: [
         .executableTarget(name: "MyDataDC", dependencies: ["MyDataDCAppShell"]),
         .target(name: "MyDataDCCore"),
         .target(name: "CareerHQCore"),
         .target(name: "CareerHQUI", dependencies: ["CareerHQCore"]),
-        .target(name: "MyDataDCAppShell", dependencies: ["MyDataDCCore", "CareerHQCore", "CareerHQUI", "NetSphereCore", "MoneyHQCore", "VitalsCore", "TimeCore"]),
+        .target(name: "MyDataDCAppShell", dependencies: ["MyDataDCCore", "CareerHQCore", "CareerHQUI", "NetSphereCore", "MoneyHQCore", "VitalsCore", "TimeCore", "FornixNubiumCore"]),
         .target(name: "LivingEnvironmentCore"),
         .target(name: "GalleryCore"),
         .target(name: "LivingPanelsCore", dependencies: ["GalleryCore", "LivingEnvironmentCore"]),
@@ -43,6 +44,7 @@ let package = Package(
         .target(name: "MoneyHQCore"),
         .target(name: "VitalsCore"),
         .target(name: "TimeCore"),
+        .target(name: "FornixNubiumCore"),
         .testTarget(name: "MyDataDCCoreTests", dependencies: ["MyDataDCCore"]),
         .testTarget(name: "CareerHQCoreTests", dependencies: ["CareerHQCore"]),
         .testTarget(name: "MyDataDCAppShellTests", dependencies: ["MyDataDCAppShell", "MyDataDCCore", "NetSphereCore", "MoneyHQCore", "VitalsCore", "TimeCore"]),
@@ -58,6 +60,7 @@ let package = Package(
         .testTarget(name: "NetSphereCoreTests", dependencies: ["NetSphereCore"]),
         .testTarget(name: "MoneyHQCoreTests", dependencies: ["MoneyHQCore"]),
         .testTarget(name: "VitalsCoreTests", dependencies: ["VitalsCore"]),
-        .testTarget(name: "TimeCoreTests", dependencies: ["TimeCore"])
+        .testTarget(name: "TimeCoreTests", dependencies: ["TimeCore"]),
+        .testTarget(name: "FornixNubiumCoreTests", dependencies: ["FornixNubiumCore"])
     ]
 )

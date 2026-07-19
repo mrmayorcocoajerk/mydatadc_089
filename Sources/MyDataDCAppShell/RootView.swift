@@ -44,6 +44,10 @@ public struct MyDataDCRootView: View {
                 TimeStudioView {
                     state.returnToManor()
                 }
+            } else if state.selectedModuleID == .fornixNubium {
+                FornixNubiumView {
+                    state.returnToManor()
+                }
             } else if let module = state.selectedModule {
                 ModuleWorkspaceView(module: module) {
                     state.returnToManor()
