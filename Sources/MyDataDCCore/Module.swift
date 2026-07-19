@@ -8,6 +8,7 @@ public enum MyDataDCModuleID: String, CaseIterable, Codable, Sendable {
     case careerHQ
     case moneyHQ
     case vitalsStudio
+    case timeStudio
     case newsDesk
     case parcelDeliveryDropZone
     case electronicMailDigitalDoormat

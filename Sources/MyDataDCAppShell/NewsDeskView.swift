@@ -8,13 +8,21 @@ public struct NewsDeskView: View {
     private let onReturnToManor: () -> Void
 
     public init(
-        viewModel: NewsDeskViewModel = NewsDeskViewModel(),
+        onReturnToManor: @escaping () -> Void
+    ) {
+        self.init(
+            viewModel: NewsDeskViewModel(),
+            onReturnToManor: onReturnToManor
+        )
+    }
+
+    public init(
+        viewModel: NewsDeskViewModel,
         onReturnToManor: @escaping () -> Void
     ) {
         _viewModel = StateObject(wrappedValue: viewModel)
         self.onReturnToManor = onReturnToManor
     }
-
     public var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()

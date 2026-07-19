@@ -33,6 +33,7 @@ public actor ModuleRegistry {
         .init(id: .careerHQ, displayName: "Career HQ", subtitle: "Applications, opportunities, and growth", systemImage: "briefcase.fill"),
         .init(id: .moneyHQ, displayName: "Money HQ", subtitle: "Financial command center", systemImage: "chart.pie.fill"),
         .init(id: .vitalsStudio, displayName: "Vitals Studio", subtitle: "Health, activity, and wellbeing", systemImage: "heart.text.square.fill"),
+        .init(id: .timeStudio, displayName: "Time Studio", subtitle: "Timers, stopwatch, and focused sessions", systemImage: "timer"),
         .init(id: .newsDesk, displayName: "NewsDesk", subtitle: "Every headline. Different perspectives. One desk.", systemImage: "newspaper.fill"),
         .init(id: .parcelDeliveryDropZone, displayName: "Parcel Delivery Drop Zone", subtitle: "Track deliveries and logistics", systemImage: "shippingbox.fill"),
         .init(id: .electronicMailDigitalDoormat, displayName: "Electronic Mail Digital Doormat", subtitle: "Unified mail and message entry", systemImage: "envelope.badge.fill"),

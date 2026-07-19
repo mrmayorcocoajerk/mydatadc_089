@@ -36,6 +36,14 @@ public struct MyDataDCRootView: View {
                 MoneyHQView {
                     state.returnToManor()
                 }
+            } else if state.selectedModuleID == .vitalsStudio {
+                VitalsStudioView {
+                    state.returnToManor()
+                }
+            } else if state.selectedModuleID == .timeStudio {
+                TimeStudioView {
+                    state.returnToManor()
+                }
             } else if let module = state.selectedModule {
                 ModuleWorkspaceView(module: module) {
                     state.returnToManor()

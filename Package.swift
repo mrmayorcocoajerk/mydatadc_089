@@ -21,14 +21,15 @@ let package = Package(
         .library(name: "DigiSphereCore", targets: ["DigiSphereCore"]),
         .library(name: "NetSphereCore", targets: ["NetSphereCore"]),
         .library(name: "MoneyHQCore", targets: ["MoneyHQCore"]),
-        .library(name: "VitalsCore", targets: ["VitalsCore"])
+        .library(name: "VitalsCore", targets: ["VitalsCore"]),
+        .library(name: "TimeCore", targets: ["TimeCore"])
     ],
     targets: [
         .executableTarget(name: "MyDataDC", dependencies: ["MyDataDCAppShell"]),
         .target(name: "MyDataDCCore"),
         .target(name: "CareerHQCore"),
         .target(name: "CareerHQUI", dependencies: ["CareerHQCore"]),
-        .target(name: "MyDataDCAppShell", dependencies: ["MyDataDCCore", "CareerHQCore", "CareerHQUI", "NetSphereCore", "MoneyHQCore", "VitalsCore"]),
+        .target(name: "MyDataDCAppShell", dependencies: ["MyDataDCCore", "CareerHQCore", "CareerHQUI", "NetSphereCore", "MoneyHQCore", "VitalsCore", "TimeCore"]),
         .target(name: "LivingEnvironmentCore"),
         .target(name: "GalleryCore"),
         .target(name: "LivingPanelsCore", dependencies: ["GalleryCore", "LivingEnvironmentCore"]),
@@ -41,9 +42,10 @@ let package = Package(
         .target(name: "NetSphereCore"),
         .target(name: "MoneyHQCore"),
         .target(name: "VitalsCore"),
+        .target(name: "TimeCore"),
         .testTarget(name: "MyDataDCCoreTests", dependencies: ["MyDataDCCore"]),
         .testTarget(name: "CareerHQCoreTests", dependencies: ["CareerHQCore"]),
-        .testTarget(name: "MyDataDCAppShellTests", dependencies: ["MyDataDCAppShell", "MyDataDCCore", "NetSphereCore", "MoneyHQCore", "VitalsCore"]),
+        .testTarget(name: "MyDataDCAppShellTests", dependencies: ["MyDataDCAppShell", "MyDataDCCore", "NetSphereCore", "MoneyHQCore", "VitalsCore", "TimeCore"]),
         .testTarget(name: "LivingEnvironmentCoreTests", dependencies: ["LivingEnvironmentCore"]),
         .testTarget(name: "GalleryCoreTests", dependencies: ["GalleryCore"]),
         .testTarget(name: "LivingPanelsCoreTests", dependencies: ["LivingPanelsCore", "GalleryCore", "LivingEnvironmentCore"]),
@@ -55,6 +57,7 @@ let package = Package(
         .testTarget(name: "DigiSphereCoreTests", dependencies: ["DigiSphereCore"]),
         .testTarget(name: "NetSphereCoreTests", dependencies: ["NetSphereCore"]),
         .testTarget(name: "MoneyHQCoreTests", dependencies: ["MoneyHQCore"]),
-        .testTarget(name: "VitalsCoreTests", dependencies: ["VitalsCore"])
+        .testTarget(name: "VitalsCoreTests", dependencies: ["VitalsCore"]),
+        .testTarget(name: "TimeCoreTests", dependencies: ["TimeCore"])
     ]
 )
