@@ -51,6 +51,8 @@ import Testing
         name: "Launch Plan.pdf",
         kind: .document,
         byteCount: 1_024,
+        createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+        modifiedAt: Date(timeIntervalSince1970: 1_700_000_000),
         fingerprint: "launch-plan",
         tags: ["strategy"],
         folderName: "Projects",
